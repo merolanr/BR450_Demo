@@ -84,7 +84,9 @@ app.o: ../app.c \
  c:\users\nick\ merola\simplicitystudio\sdks\gecko_sdk\platform\emlib\inc\em_cmu_compat.h \
  c:\users\nick\ merola\simplicitystudio\sdks\gecko_sdk\platform\emlib\inc\em_iadc.h \
  c:\users\nick\ merola\simplicitystudio\sdks\gecko_sdk\platform\emlib\inc\em_gpio.h \
- c:\users\nick\ merola\simplicitystudio\sdks\gecko_sdk\hardware\driver\imu\inc\sl_imu.h
+ c:\users\nick\ merola\simplicitystudio\sdks\gecko_sdk\hardware\driver\imu\inc\sl_imu.h \
+ c:\users\nick\ merola\simplicitystudio\sdks\gecko_sdk\platform\emlib\inc\em_i2c.h \
+ ../lmp91000.h
 c:\users\nick\ merola\simplicitystudio\sdks\gecko_sdk\platform\common\toolchain\inc\sl_gcc_preinclude.h:
 c:\users\nick\ merola\simplicitystudio\sdks\gecko_sdk\platform\emlib\inc\em_common.h:
 c:\users\nick\ merola\simplicitystudio\sdks\gecko_sdk\platform\device\siliconlabs\efr32mg22\include\em_device.h:
@@ -171,3 +173,5 @@ c:\users\nick\ merola\simplicitystudio\sdks\gecko_sdk\platform\emlib\inc\em_cmu_
 c:\users\nick\ merola\simplicitystudio\sdks\gecko_sdk\platform\emlib\inc\em_iadc.h:
 c:\users\nick\ merola\simplicitystudio\sdks\gecko_sdk\platform\emlib\inc\em_gpio.h:
 c:\users\nick\ merola\simplicitystudio\sdks\gecko_sdk\hardware\driver\imu\inc\sl_imu.h:
+c:\users\nick\ merola\simplicitystudio\sdks\gecko_sdk\platform\emlib\inc\em_i2c.h:
+../lmp91000.h:

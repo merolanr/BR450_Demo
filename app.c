@@ -39,6 +39,9 @@
 #include "em_gpio.h"
 #include "sl_imu.h"
 #include "stdio.h"
+#include "em_i2c.h"
+#include "em_emu.h"
+#include "lmp91000.h"
 
 #define CLK_SRC_ADC_FREQ          20000000 // CLK_SRC_ADC
 #define CLK_ADC_FREQ              10000000 // CLK_ADC - 10MHz max in normal mode
@@ -50,7 +53,16 @@
 #define IADC_INPUT_0_BUSALLOC     GPIO_BBUSALLOC_BEVEN0_ADC0
 #define IADC_INPUT_1_BUS          BBUSALLOC
 #define IADC_INPUT_1_BUSALLOC     GPIO_BBUSALLOC_BODD0_ADC0
+// Defines
+#define I2C_TXBUFFER_SIZE                 10
+#define I2C_RXBUFFER_SIZE                 10
 
+// Buffers
+uint8_t i2c_txBuffer[I2C_TXBUFFER_SIZE];
+uint8_t i2c_rxBuffer[I2C_RXBUFFER_SIZE];
+
+// Transmission flags
+volatile bool i2c_startTx;
 
 static volatile int32_t sample;
 static volatile double singleResult; // Volts
@@ -61,12 +73,204 @@ static uint8_t advertising_set_handle = 0xff;
 
 static uint8_t counter = 0;
 
-static volatile int16_t a_vec[3];
+//static volatile int16_t a_vec[3];
 
 /**************************************************************************//**
  * Application Init.
  *****************************************************************************/
 
+void initCMU(void)
+{
+  // Enable clocks to the I2C and GPIO
+  CMU_ClockEnable(cmuClock_I2C0, true);
+  CMU_ClockEnable(cmuClock_GPIO, true);
+}
+
+
+//void initI2C(void)
+//{
+//  // Use default settings
+//  I2C_Init_TypeDef i2cInit = I2C_INIT_DEFAULT;
+//
+//  // Using PA0 (SDA) and PA1 (SCL) LMP2
+//  GPIO_PinModeSet(gpioPortA, 0, gpioModeWiredAndPullUpFilter, 1);
+//  GPIO_PinModeSet(gpioPortA, 1, gpioModeWiredAndPullUpFilter, 1);
+//
+//  // Route I2C pins to GPIO
+//  GPIO->I2CROUTE[0].SDAROUTE = (GPIO->I2CROUTE[0].SDAROUTE & ~_GPIO_I2C_SDAROUTE_MASK)
+//                        | (gpioPortA << _GPIO_I2C_SDAROUTE_PORT_SHIFT
+//                        | (5 << _GPIO_I2C_SDAROUTE_PIN_SHIFT));
+//  GPIO->I2CROUTE[0].SCLROUTE = (GPIO->I2CROUTE[0].SCLROUTE & ~_GPIO_I2C_SCLROUTE_MASK)
+//                        | (gpioPortA << _GPIO_I2C_SCLROUTE_PORT_SHIFT
+//                        | (6 << _GPIO_I2C_SCLROUTE_PIN_SHIFT));
+//  GPIO->I2CROUTE[0].ROUTEEN = GPIO_I2C_ROUTEEN_SDAPEN | GPIO_I2C_ROUTEEN_SCLPEN;
+//
+//  // Initialize the I2C
+//  I2C_Init(I2C0, &i2cInit);
+//
+//  // Set the status flags and index
+//  i2c_startTx = false;
+//
+//  // Enable automatic STOP on NACK
+//  I2C0->CTRL = I2C_CTRL_AUTOSN;
+//}
+//
+//void lmp_read(uint8_t targetAddress, uint8_t *rxBuff) //i2c read function, used in other functions for communication with lmp91000
+//{
+//   uint8_t numBytes = 1;
+//  // Transfer structure
+//  I2C_TransferSeq_TypeDef i2cTransfer;
+//  I2C_TransferReturn_TypeDef result;
+//
+//  // Initialize I2C transfer
+//  i2cTransfer.addr          = LMP91000_I2C_ADDRESS;
+//  i2cTransfer.flags         = I2C_FLAG_WRITE_READ; // must write target address before reading
+//  i2cTransfer.buf[0].data   = &targetAddress;
+//  i2cTransfer.buf[0].len    = 1;
+//  i2cTransfer.buf[1].data   = rxBuff;
+//  i2cTransfer.buf[1].len    = numBytes;
+//
+//  result = I2C_TransferInit(I2C0, &i2cTransfer);
+//
+//  // Send data
+//  while (result == i2cTransferInProgress) {
+//    result = I2C_Transfer(I2C0);
+//  }
+//
+//}
+
+//void lmp_write(uint8_t targetAddress, uint8_t *txBuff) //i2c write function, used in other functions for communication with lmp91000
+//{
+//  uint8_t numBytes = 1;
+//
+//  // Transfer structure
+//  I2C_TransferSeq_TypeDef i2cTransfer;
+//  I2C_TransferReturn_TypeDef result;
+//  uint8_t txBuffer[I2C_TXBUFFER_SIZE + 1];
+//
+//  txBuffer[0] = targetAddress;
+//  for(int i = 0; i < numBytes; i++)
+//  {
+//      txBuffer[i + 1] = txBuff[i];
+//  }
+//
+//  // Initialize I2C transfer
+//  i2cTransfer.addr          = LMP91000_I2C_ADDRESS;
+//  i2cTransfer.flags         = I2C_FLAG_WRITE;
+//  i2cTransfer.buf[0].data   = txBuffer;
+//  i2cTransfer.buf[0].len    = numBytes + 1;
+//  i2cTransfer.buf[1].data   = NULL;
+//  i2cTransfer.buf[1].len    = 0;
+//
+//  result = I2C_TransferInit(I2C0, &i2cTransfer);
+//
+//  // Send data
+//  while (result == i2cTransferInProgress) {
+//    result = I2C_Transfer(I2C0);
+//  }
+//}
+//
+//bool isReady(void) const
+//{
+//    return lmp_read(LMP91000_STATUS_REG)==LMP91000_READY;
+//}
+//
+//void lock(void)
+//{
+//    lmp_write(LMP91000_LOCK_REG, LMP91000_WRITE_LOCK);
+//}
+//
+//void unlock(void)
+//{
+//    lmp_write(LMP91000_LOCK_REG, LMP91000_WRITE_UNLOCK);
+//}
+
+////set transimpedance amplifier gain
+//void setGain(uint8_t user_gain)
+//{
+//    unlock();
+//    uint8_t data = read(LMP91000_TIACN_REG);
+//    data &= ~(7 << 2); //clears bits 2-4
+//    data |= (user_gain << 2); //writes to bits 2-4
+//    lmp_write(LMP91000_TIACN_REG, data);
+//}
+
+////set internal resistance
+//void setRLoad(uint8_t load)
+//{
+//    unlock();
+//    uint8_t data = read(LMP91000_TIACN_REG);
+//    data &= ~3; //clears 0th and 1st bits
+//    data |= load; //writes to 0th and 1st bits
+//    lmp_write(LMP91000_TIACN_REG, data);
+//}
+//
+////places LMP in sleep mode (0.6 uA current)
+//void sleep(void)
+//{
+//    uint8_t data = read(LMP91000_MODECN_REG);
+//    data &= ~(0x07);
+//    lmp_write(LMP91000_MODECN_REG, data);
+//}
+//
+////sets device to 2-electrode potentiometric mode
+//void setTwoLead(void)
+//{
+//    uint8_t data = read(LMP91000_MODECN_REG);
+//    data &= ~(0x07);
+//    data |= (0x01);
+//    lmp_write(LMP91000_MODECN_REG, data);
+//}
+//
+////sets device to 3-electrode potentiometric mode
+//void setThreeLead(void)
+//{
+//    uint8_t data = read(LMP91000_MODECN_REG);
+//    data &= ~(0x07);
+//    data |= (0x03);
+//    lmp_write(LMP91000_MODECN_REG, data);
+//}
+//
+////places device in standby mode
+//void standby(void)
+//{
+//    uint8_t data = read(LMP91000_MODECN_REG);
+//    data &= ~(0x07);
+//    data |= (0x02);
+//    lmp_write(LMP91000_MODECN_REG, data);
+//}
+//
+////measure current of cell
+//void measureCell(void)
+//{
+//    uint8_t data = read(LMP91000_MODECN_REG);
+//    data &= ~(0x07); //clears the first three bits
+//    data |= (0x06);
+//    lmp_write(LMP91000_MODECN_REG, data);
+//}
+//
+//void getTemp(void)
+//{
+//    uint8_t data = read(LMP91000_MODECN_REG);
+//    data |= (0x07);
+//    write(LMP91000_MODECN_REG, data);
+//}
+//
+//void lmp1_enable(void)
+//{
+//  // Using menb (PA13)
+//  GPIO_PinOutClear(gpioPortA, 13); //set PA3 low (system enable)
+//  //GPIO_PinOutClear(gpioPortA, pin); //set PA3 low (system enable)
+//}
+//
+//void lmp1_disable(void)
+//{
+//  // Using menb (PA13)
+//  GPIO_PinOutSet(gpioPortA, 13); //set PA3 disable (system disable)
+//  //GPIO_PinOutSet(gpioPortA, pin); //set PA3 disable (system disable)
+//}
+//
+//
 void initIADC (void)
 {
   // Declare init structs
@@ -134,13 +338,13 @@ SL_WEAK void app_init(void)
   /////////////////////////////////////////////////////////////////////////////
   CHIP_Init();
   initIADC();
-  sl_imu_init();
+//  sl_imu_init();
 
-  // Configure sample rate
-  sl_imu_configure(10);
-
-  // Recalibrate gyro
-  sl_imu_calibrate_gyro();
+//  // Configure sample rate
+//  sl_imu_configure(10);
+//
+//  // Recalibrate gyro
+//  sl_imu_calibrate_gyro();
 
 
 }
@@ -275,25 +479,25 @@ void sl_bt_on_event(sl_bt_msg_t *evt)
 
           break;
 
-        case gattdb_read_imu:
-          sl_imu_update();
-
-          while (!sl_imu_is_data_ready()) {
-            // wait
-          }
-
-          sl_imu_get_acceleration(a_vec);
-
-          int16_t sumOfElements = 0;
-          for(int i=0; i<2; i++)
-            {
-              sumOfElements += a_vec[i];
-            }
-
-          sz = sizeof(sumOfElements);
-          p  =  (uint8_t*) &sumOfElements;
-
-          break;
+//        case gattdb_read_imu:
+//          sl_imu_update();
+//
+//          while (!sl_imu_is_data_ready()) {
+//            // wait
+//          }
+//
+//          sl_imu_get_acceleration(a_vec);
+//
+//          int16_t sumOfElements = 0;
+//          for(int i=0; i<2; i++)
+//            {
+//              sumOfElements += a_vec[i];
+//            }
+//
+//          sz = sizeof(sumOfElements);
+//          p  =  (uint8_t*) &sumOfElements;
+//
+//          break;
       }
       sl_bt_gatt_server_send_user_read_response(
           request->connection,
@@ -313,3 +517,4 @@ void sl_bt_on_event(sl_bt_msg_t *evt)
       break;
   }
 }
+

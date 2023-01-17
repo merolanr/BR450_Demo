@@ -86,6 +86,14 @@
 #define USART0_CS_PORT                           gpioPortD
 #define USART0_CS_PIN                            2
 
+// USART0 CTS on PC01
+#define USART0_CTS_PORT                          gpioPortC
+#define USART0_CTS_PIN                           1
+
+// USART0 RTS on PC02
+#define USART0_RTS_PORT                          gpioPortC
+#define USART0_RTS_PIN                           2
+
 // USART0 RX on PD01
 #define USART0_RX_PORT                           gpioPortD
 #define USART0_RX_PIN                            1
